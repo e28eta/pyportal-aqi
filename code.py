@@ -1,15 +1,6 @@
 """
 This uses PyPortal and python-aqi to display AQI, pulling data from purpleair.com.
 
-It averages the AQI across multiple sensors, and averages the Lat/Long of those sensors for the displayed "location".
-
-PurpleAir API docs seem to be here:
-https://docs.google.com/document/d/15ijz94dXJ-YAZLi9iZ_RaBwrZ4KtYeCy08goGBwnbCU/edit
-
-Set `purpleair_sensors` in secrets.yml to the list of sensors around you, joined with the pipe character `|`. The sensor ids can be found on the map, in the "Get this Widget" code.
-
-The "Get this Widget" link also includes a `key` parameter, and that can be included in the request by setting the `purpleair_token` secret. Looks like that could be used to view data from a private sensor.
-
 Adapted from https://github.com/adafruit/Adafruit_Learning_System_Guides/tree/master/PyPortal_AirQuality
 
 The license on PyPortal_AirQuality is the MIT License
