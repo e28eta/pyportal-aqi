@@ -1,7 +1,9 @@
 """
-This uses PyPortal and python-aqi to display AQI, pulling data from purpleair.com.
+This uses PyPortal and python-aqi to display AQI, pulling data from
+purpleair.com.
 
-Adapted from https://github.com/adafruit/Adafruit_Learning_System_Guides/tree/master/PyPortal_AirQuality
+Adapted from:
+https://github.com/adafruit/Adafruit_Learning_System_Guides/tree/master/PyPortal_AirQuality
 
 The license on PyPortal_AirQuality is the MIT License
 
@@ -40,21 +42,22 @@ except ImportError:
 
 # Set up where we'll be fetching data from
 DATA_SOURCE = "https://www.purpleair.com/json"
-DATA_SOURCE += "?show=" + secrets['purpleair_sensors'] + "&key=" + secrets['purpleair_token']
+DATA_SOURCE += "?show=" + secrets['purpleair_sensors']
+DATA_SOURCE += "&key=" + secrets['purpleair_token']
 
 AVG_LAT = None
 AVG_LONG = None
 
 """
-Purple Air gives pm 2.5 and pm 10.0 values. Using the EPA algorithm from python-aqi
-to translate those into AQI numbers.
-Also, while iterating through the purpleair sensor results, compute the avg lat/long
-for display.
+Purple Air gives pm 2.5 and pm 10.0 values. Using the EPA algorithm from
+python-aqi to translate those into AQI numbers.
+Also, while iterating through the purpleair sensor results, compute the avg
+lat/long for display.
 """
 def calc_aqi_from_purpleair(json_dict):
     global AVG_LAT, AVG_LONG
     aqis, lats, longs = [], [], []
-    
+
     for result in json_dict['results']:
         if result['pm2_5_atm']:
             # I haven't tested how this works if pm10 is missing
@@ -63,14 +66,16 @@ def calc_aqi_from_purpleair(json_dict):
                 (aqi.POLLUTANT_PM10, result['pm10_0_atm'])
             ])
             aqis.append(this_aqi)
-            
-            # since I chose sensors from the public map, they all had valid Lat/Lon
-            if result['Lat']: lats.append(result['Lat'])
-            if result['Lon']: longs.append(result['Lon'])
-    
+
+            # I chose sensors from the public map, they all had valid Lat/Lon
+            if result['Lat']:
+                lats.append(result['Lat'])
+            if result['Lon']:
+                longs.append(result['Lon'])
+
     # Stick average AQI into JSON so that PyPortal's `json_path` can find it
     json_dict['avg_aqi'] = sum(aqis) / len(aqis)
-    
+
     if len(lats) > 0 and len(longs) > 0:
         # Update global value of avg lat/long so we can update the caption
         AVG_LAT = sum(lats) / len(lats)
@@ -109,12 +114,16 @@ while True:
         if 201 <= value <= 300:
             pyportal.set_background(0x8e24aa)  # very unhealthy
         if 301 <= value <= 500:
-            pyportal.set_background(0xb71c1c ) # hazardous
-            
-        if AVG_LAT and AVG_LONG:
-            pyportal.set_caption('AQI for ({0:5.2f}, {1:6.2f})'.format(AVG_LAT, AVG_LONG),
-                                 (15, 220), 0x000000)
+            pyportal.set_background(0xb71c1c)  # hazardous
 
+        if AVG_LAT and AVG_LONG:
+            pyportal.set_caption('AQI for ({0:5.2f}, {1:6.2f})'
+                                 .format(AVG_LAT, AVG_LONG),
+                                 (15, 220), 0x000000)
+    except ValueError as e:
+        # Possibly PurpleAir is having load problems.
+        # See https://github.com/e28eta/pyportal-aqi/issues/1
+        print("ValueError occurred, retrying! -", e)
     except RuntimeError as e:
         print("Some error occured, retrying! -", e)
 
