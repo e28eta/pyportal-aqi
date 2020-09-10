@@ -120,7 +120,10 @@ while True:
             pyportal.set_caption('AQI for ({0:5.2f}, {1:6.2f})'
                                  .format(AVG_LAT, AVG_LONG),
                                  (15, 220), 0x000000)
-
+    except ValueError as e:
+        # Possibly PurpleAir is having load problems.
+        # See https://github.com/e28eta/pyportal-aqi/issues/1
+        print("ValueError occurred, retrying! -", e)
     except RuntimeError as e:
         print("Some error occured, retrying! -", e)
 
