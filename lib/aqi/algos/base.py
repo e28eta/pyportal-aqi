@@ -12,7 +12,7 @@ class BaseAQI(object):
 
         :param elem: pollutant constant
         :type elem: int
-        :param cc: pollutant contentration (µg/m³ or ppm)
+        :param cc: pollutant concentration (µg/m³ or ppm)
         :type cc: str
         """
         raise NotImplementedError
@@ -66,8 +66,17 @@ class PiecewiseAQI(BaseAQI):
 
         _cc = round(float(cc), self.piecewise['prec'][elem])
 
-        # define breakpoints for this pollutant at this contentration
+        # define breakpoints for this pollutant at this concentration
         bps = self.piecewise['bp'][elem]
+        aqis = self.piecewise['aqi']
+
+        # Handle out-of-range values by clamping to lowest/highest value
+        if _cc < bps[0][0]:
+            return float(aqis[0][0])
+        if _cc > bps[-1][1]:
+            return float(aqis[-1][1])
+
+        # otherwise find correct range
         bplo = None
         bphi = None
         idx = 0
@@ -78,7 +87,7 @@ class PiecewiseAQI(BaseAQI):
                 break
             idx += 1
         # get corresponding AQI boundaries
-        (aqilo, aqihi) = self.piecewise['aqi'][idx]
+        (aqilo, aqihi) = aqis[idx]
 
         # equation
         value = (aqihi - aqilo) / (bphi - bplo) * (_cc - bplo) + aqilo
