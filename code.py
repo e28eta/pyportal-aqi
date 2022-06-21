@@ -28,6 +28,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 """
+
 import time
 import board
 from adafruit_pyportal import PyPortal
@@ -40,38 +41,60 @@ except ImportError:
     print("WiFi secrets are kept in secrets.py, please add them there!")
     raise
 
-# Set up where we'll be fetching data from
-DATA_SOURCE = "https://www.purpleair.com/json"
-DATA_SOURCE += "?show=" + secrets['purpleair_sensors']
-DATA_SOURCE += "&key=" + secrets['purpleair_token']
+# See https://api.purpleair.com/#api-sensors-get-sensors-data
+DATA_SOURCE = ("https://api.purpleair.com/v1/sensors"
+               # comma separated list of sensor IDs
+               "?show_only=" + secrets['purpleair_sensors'] +
+               # outdoor sensors only
+               "&location_type=0"
+               # updated in last hour, since my display is supposed to be near-real-time
+               "&max_age=3600"
+               # fields used in calc_aqi_from_purpleair
+               "&fields=pm2.5_atm,pm10.0_atm,latitude,longitude")
 
 AVG_LAT = None
 AVG_LONG = None
+LAST_UPDATE = None
 
 """
 Purple Air gives pm 2.5 and pm 10.0 values. Using the EPA algorithm from
 python-aqi to translate those into AQI numbers.
 Also, while iterating through the purpleair sensor results, compute the avg
 lat/long for display.
+
+Note: I have not evaluated any of the data available in v1 of the API, simply
+ported over existing code from the older API. Ref: https://api.purpleair.com/#api-sensors-get-sensors-data
 """
 def calc_aqi_from_purpleair(json_dict):
-    global AVG_LAT, AVG_LONG
+    global AVG_LAT, AVG_LONG, LAST_UPDATE
     aqis, lats, longs = [], [], []
 
-    for result in json_dict['results']:
-        if result['pm2_5_atm']:
-            # I haven't tested how this works if pm10 is missing
-            this_aqi = aqi.to_aqi([
-                (aqi.POLLUTANT_PM25, result['pm2_5_atm']),
-                (aqi.POLLUTANT_PM10, result['pm10_0_atm'])
-            ])
-            aqis.append(this_aqi)
+    # Burn some CPU cycles on every response to future-proof, although their API should
+    # always return data in the same order it was requested
+    try:
+        fields = json_dict['fields']
+        field_count = len(fields)
+        pm2_5_atm = fields.index('pm2.5_atm')
+        pm10_0_atm = fields.index('pm10.0_atm')
+        lat = fields.index('latitude')
+        long = fields.index('longitude')
+    except ValueError as e:
+        print("ValueError while parsing response:", e)
+        raise e
 
-            # I chose sensors from the public map, they all had valid Lat/Lon
-            if result['Lat']:
-                lats.append(result['Lat'])
-            if result['Lon']:
-                longs.append(result['Lon'])
+    for result in json_dict['data']:
+        if not (len(result) >= field_count): continue
+
+        # I haven't tested how this works if pm10 is missing
+        this_aqi = aqi.to_aqi([
+            (aqi.POLLUTANT_PM25, result[pm2_5_atm]),
+            (aqi.POLLUTANT_PM10, result[pm10_0_atm])
+        ])
+        aqis.append(this_aqi)
+
+        # I chose sensors from the public map, they all had valid Lat/Lon
+        lats.append(result[lat])
+        longs.append(result[long])
 
     # Stick average AQI into JSON so that PyPortal's `json_path` can find it
     json_dict['avg_aqi'] = sum(aqis) / len(aqis)
@@ -80,12 +103,15 @@ def calc_aqi_from_purpleair(json_dict):
         # Update global value of avg lat/long so we can update the caption
         AVG_LAT = sum(lats) / len(lats)
         AVG_LONG = sum(longs) / len(longs)
+    if json_dict['data_time_stamp']:
+        LAST_UPDATE = time.localtime(json_dict['data_time_stamp'])
 
 # the current working directory (where this file is)
 cwd = ("/"+__file__).rsplit('/', 1)[0]
 # Initialize the pyportal object and let us know what data to fetch and where
 # to display it
 pyportal = PyPortal(url=DATA_SOURCE,
+                    headers={'X-API-Key': secrets['purpleair_token']},
                     json_path=['avg_aqi'],
                     json_transform=calc_aqi_from_purpleair,
                     status_neopixel=board.NEOPIXEL,
@@ -116,10 +142,11 @@ while True:
         if 301 <= value <= 500:
             pyportal.set_background(0xb71c1c)  # hazardous
 
-        if AVG_LAT and AVG_LONG:
-            pyportal.set_caption('AQI for ({0:5.2f}, {1:6.2f})'
-                                 .format(AVG_LAT, AVG_LONG),
-                                 (15, 220), 0x000000)
+        # FIXME: this doesn't update the caption, it adds a _new_ caption on top of the old :sad:
+        pyportal.set_caption('at {:02}:{:02}:{:02} on {}/{}'
+                            .format(LAST_UPDATE.tm_hour, LAST_UPDATE.tm_min, LAST_UPDATE.tm_sec,
+                                    LAST_UPDATE.tm_mon, LAST_UPDATE.tm_mday),
+                            (15, 220), 0x000000)
     except ValueError as e:
         # Possibly PurpleAir is having load problems.
         # See https://github.com/e28eta/pyportal-aqi/issues/1

@@ -1,0 +1,1 @@
+adafruit_pyportal==6.2.3
