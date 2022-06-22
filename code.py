@@ -47,8 +47,6 @@ except ImportError:
 DATA_SOURCE = ("https://api.purpleair.com/v1/sensors"
                # comma separated list of sensor IDs
                "?show_only=" + secrets['purpleair_sensors'] +
-               # outdoor sensors only
-               "&location_type=0"
                # updated in last hour, since my display is supposed to be near-real-time
                "&max_age=3600"
                # fields used in calc_aqi_from_purpleair
