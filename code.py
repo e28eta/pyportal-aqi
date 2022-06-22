@@ -50,10 +50,8 @@ DATA_SOURCE = ("https://api.purpleair.com/v1/sensors"
                # updated in last hour, since my display is supposed to be near-real-time
                "&max_age=3600"
                # fields used in calc_aqi_from_purpleair
-               "&fields=pm2.5_atm,pm10.0_atm,latitude,longitude")
+               "&fields=pm2.5_atm,pm10.0_atm")
 
-AVG_LAT = None
-AVG_LONG = None
 LAST_UPDATE = None
 
 """
@@ -66,8 +64,8 @@ Note: I have not evaluated any of the data available in v1 of the API, simply
 ported over existing code from the older API. Ref: https://api.purpleair.com/#api-sensors-get-sensors-data
 """
 def calc_aqi_from_purpleair(json_dict):
-    global AVG_LAT, AVG_LONG, LAST_UPDATE
-    aqis, lats, longs = [], [], []
+    global LAST_UPDATE
+    aqis = []
 
     # Burn some CPU cycles on every response to future-proof, although their API should
     # always return data in the same order it was requested
@@ -76,8 +74,6 @@ def calc_aqi_from_purpleair(json_dict):
         field_count = len(fields)
         pm2_5_atm = fields.index('pm2.5_atm')
         pm10_0_atm = fields.index('pm10.0_atm')
-        lat = fields.index('latitude')
-        long = fields.index('longitude')
     except ValueError as e:
         print("ValueError while parsing response:", e)
         raise e
@@ -85,31 +81,26 @@ def calc_aqi_from_purpleair(json_dict):
     for result in json_dict['data']:
         if not (len(result) >= field_count): continue
 
-        # I haven't tested how this works if pm10 is missing
         this_aqi = aqi.to_aqi([
             (aqi.POLLUTANT_PM25, result[pm2_5_atm]),
             (aqi.POLLUTANT_PM10, result[pm10_0_atm])
         ])
         aqis.append(this_aqi)
 
-        # I chose sensors from the public map, they all had valid Lat/Lon
-        lats.append(result[lat])
-        longs.append(result[long])
-
     # Stick average AQI into JSON so that PyPortal's `json_path` can find it
-    json_dict['avg_aqi'] = sum(aqis) / len(aqis)
-
-    if len(lats) > 0 and len(longs) > 0:
-        # Update global value of avg lat/long so we can update the caption
-        AVG_LAT = sum(lats) / len(lats)
-        AVG_LONG = sum(longs) / len(longs)
+    if (len(aqis) > 0):
+        json_dict['avg_aqi'] = sum(aqis) / len(aqis)
+    else:
+        json_dict['avg_aqi'] = 'Unknown'
     if json_dict['data_time_stamp']:
-        LAST_UPDATE = time.localtime(json_dict['data_time_stamp'])
+        try:
+            LAST_UPDATE = time.localtime(json_dict['data_time_stamp'])
+        except:
+            LAST_UPDATE = None
 
 # the current working directory (where this file is)
 cwd = ("/"+__file__).rsplit('/', 1)[0]
-# Initialize the pyportal object and let us know what data to fetch and where
-# to display it
+# workaround for https://github.com/adafruit/Adafruit_CircuitPython_PyPortal/issues/121
 caption_font = bitmap_font.load_font(cwd+"/fonts/HelveticaNeue-24.bdf")
 caption_label = Label(caption_font,
                       text="",
@@ -118,6 +109,8 @@ caption_label = Label(caption_font,
                       anchor_point=(0, 1.0),
                       anchored_position=(35, 225)
                       )
+# Initialize the pyportal object and let us know what data to fetch and where
+# to display it
 pyportal = PyPortal(url=DATA_SOURCE,
                     headers={'X-API-Key': secrets['purpleair_token']},
                     json_path=['avg_aqi'],
@@ -147,8 +140,11 @@ while True:
         if 301 <= value <= 500:
             pyportal.set_background(0xb71c1c)  # hazardous
 
-        caption_label.text = 'at {:02}:{:02}:{:02} UTC on {}/{}'.format(LAST_UPDATE.tm_hour, LAST_UPDATE.tm_min, LAST_UPDATE.tm_sec,
-                                                                    LAST_UPDATE.tm_mon, LAST_UPDATE.tm_mday)
+        if isinstance(LAST_UPDATE, time.struct_time):
+            caption_label.text = 'at {:02}:{:02}:{:02} UTC on {}/{}'.format(LAST_UPDATE.tm_hour, LAST_UPDATE.tm_min, LAST_UPDATE.tm_sec,
+                                                                            LAST_UPDATE.tm_mon, LAST_UPDATE.tm_mday)
+        else:
+            caption_label.text = '<unknown data_time_stamp>'
     except ValueError as e:
         # Possibly PurpleAir is having load problems.
         # See https://github.com/e28eta/pyportal-aqi/issues/1
