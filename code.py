@@ -31,6 +31,8 @@ SOFTWARE.
 
 import time
 import board
+from adafruit_bitmap_font import bitmap_font
+from adafruit_display_text.bitmap_label import Label
 from adafruit_pyportal import PyPortal
 import aqi
 
@@ -110,6 +112,14 @@ def calc_aqi_from_purpleair(json_dict):
 cwd = ("/"+__file__).rsplit('/', 1)[0]
 # Initialize the pyportal object and let us know what data to fetch and where
 # to display it
+caption_font = bitmap_font.load_font(cwd+"/fonts/HelveticaNeue-24.bdf")
+caption_label = Label(caption_font,
+                      text="",
+                      scale=1,
+                      color=0x000000,
+                      anchor_point=(0, 1.0),
+                      anchored_position=(15, 225)
+                      )
 pyportal = PyPortal(url=DATA_SOURCE,
                     headers={'X-API-Key': secrets['purpleair_token']},
                     json_path=['avg_aqi'],
@@ -119,11 +129,8 @@ pyportal = PyPortal(url=DATA_SOURCE,
                     text_font=cwd+"/fonts/Helvetica-Bold-100.bdf",
                     text_position=(90, 100),
                     text_color=0x000000,
-                    # pad caption string so there's room for lat/long later
-                    caption_text="Air Quality Index              ",
-                    caption_font=cwd+"/fonts/HelveticaNeue-24.bdf",
-                    caption_position=(15, 220),
-                    caption_color=0x000000,)
+                    )
+pyportal.splash.append(caption_label)
 
 while True:
     try:
@@ -142,11 +149,8 @@ while True:
         if 301 <= value <= 500:
             pyportal.set_background(0xb71c1c)  # hazardous
 
-        # FIXME: this doesn't update the caption, it adds a _new_ caption on top of the old :sad:
-        pyportal.set_caption('at {:02}:{:02}:{:02} on {}/{}'
-                            .format(LAST_UPDATE.tm_hour, LAST_UPDATE.tm_min, LAST_UPDATE.tm_sec,
-                                    LAST_UPDATE.tm_mon, LAST_UPDATE.tm_mday),
-                            (15, 220), 0x000000)
+        caption_label.text = 'at {:02}:{:02}:{:02} UTC on {}/{}'.format(LAST_UPDATE.tm_hour, LAST_UPDATE.tm_min, LAST_UPDATE.tm_sec,
+                                                                    LAST_UPDATE.tm_mon, LAST_UPDATE.tm_mday)
     except ValueError as e:
         # Possibly PurpleAir is having load problems.
         # See https://github.com/e28eta/pyportal-aqi/issues/1
