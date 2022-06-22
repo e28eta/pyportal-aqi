@@ -118,7 +118,7 @@ caption_label = Label(caption_font,
                       scale=1,
                       color=0x000000,
                       anchor_point=(0, 1.0),
-                      anchored_position=(15, 225)
+                      anchored_position=(35, 225)
                       )
 pyportal = PyPortal(url=DATA_SOURCE,
                     headers={'X-API-Key': secrets['purpleair_token']},
