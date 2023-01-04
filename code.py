@@ -151,5 +151,8 @@ while True:
         print("Some RuntimeError occurred, retrying! -", e)
     except OSError as e:
         print("Some OSError occurred, retrying! -", e)
+    except OutOfRetries as e:
+        # https://github.com/adafruit/Adafruit_CircuitPython_Requests/blob/8a19521fa624aa1150471ea2b066cee1d91ae296/adafruit_requests.py#L165
+        print("OutOfRetries error thrown by requests - ", e)
 
     time.sleep(10*60)  # wait 10 minutes before getting again
