@@ -57,8 +57,6 @@ LAST_UPDATE = None
 """
 Purple Air gives pm 2.5 and pm 10.0 values. Using the EPA algorithm from
 python-aqi to translate those into AQI numbers.
-Also, while iterating through the purpleair sensor results, compute the avg
-lat/long for display.
 
 Note: I have not evaluated any of the data available in v1 of the API, simply
 ported over existing code from the older API. Ref: https://api.purpleair.com/#api-sensors-get-sensors-data
@@ -150,6 +148,8 @@ while True:
         # See https://github.com/e28eta/pyportal-aqi/issues/1
         print("ValueError occurred, retrying! -", e)
     except RuntimeError as e:
-        print("Some error occured, retrying! -", e)
+        print("Some RuntimeError occurred, retrying! -", e)
+    except OSError as e:
+        print("Some OSError occurred, retrying! -", e)
 
     time.sleep(10*60)  # wait 10 minutes before getting again
