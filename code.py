@@ -33,6 +33,7 @@ import time
 import board
 from adafruit_bitmap_font import bitmap_font
 from adafruit_display_text.bitmap_label import Label
+from adafruit_requests import OutOfRetries
 from adafruit_pyportal import PyPortal
 import aqi
 
