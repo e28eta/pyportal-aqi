@@ -37,6 +37,9 @@ from adafruit_requests import OutOfRetries
 from adafruit_pyportal import PyPortal
 import aqi
 
+import microcontroller
+import watchdog
+
 # Get wifi details and more from a secrets.py file
 try:
     from secrets import secrets
@@ -122,7 +125,15 @@ pyportal = PyPortal(url=DATA_SOURCE,
                     )
 pyportal.splash.append(caption_label)
 
+wdt = microcontroller.watchdog
+wdt.timeout = 60 * 60 # reset system if not fed for an hour. This must be longer than SLEEP_TIME_SECONDS plus fetch() & processing
+wdt.mode = watchdog.WatchDogMode.RESET
+
+SLEEP_TIME_SECONDS = 10*60  # wait 10 minutes between updates
+
 while True:
+    wdt.feed()
+
     try:
         value = pyportal.fetch()
         print("Response is", value)
@@ -156,4 +167,4 @@ while True:
         # https://github.com/adafruit/Adafruit_CircuitPython_Requests/blob/8a19521fa624aa1150471ea2b066cee1d91ae296/adafruit_requests.py#L165
         print("OutOfRetries error thrown by requests - ", e)
 
-    time.sleep(10*60)  # wait 10 minutes before getting again
+    time.sleep(SLEEP_TIME_SECONDS)
