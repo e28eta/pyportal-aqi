@@ -38,7 +38,6 @@ from adafruit_pyportal import PyPortal
 import aqi
 
 import microcontroller
-import watchdog
 
 # Get wifi details and more from a secrets.py file
 try:
@@ -125,14 +124,13 @@ pyportal = PyPortal(url=DATA_SOURCE,
                     )
 pyportal.splash.append(caption_label)
 
-wdt = microcontroller.watchdog
-wdt.timeout = 60 * 60 # reset system if not fed for an hour. This must be longer than SLEEP_TIME_SECONDS plus fetch() & processing
-wdt.mode = watchdog.WatchDogMode.RESET
-
 SLEEP_TIME_SECONDS = 10*60  # wait 10 minutes between updates
+RESET_INTERVAL_SECONDS = (1 << 21) # approx 2^31 ms
 
 while True:
-    wdt.feed()
+    if time.monotonic() >= RESET_INTERVAL_SECONDS:
+        # reset every ~24 days, hypothesis that something is having problems with >32 bit tick values
+        microcontroller.reset()
 
     try:
         value = pyportal.fetch()
