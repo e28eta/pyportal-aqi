@@ -68,6 +68,8 @@ def calc_aqi_from_purpleair(json_dict):
     global LAST_UPDATE
     aqis = []
 
+    status_label.text = 'p' # parsing
+
     # Burn some CPU cycles on every response to future-proof, although their API should
     # always return data in the same order it was requested
     try:
@@ -107,9 +109,19 @@ caption_label = Label(caption_font,
                       text="",
                       scale=1,
                       color=0x000000,
-                      anchor_point=(0, 1.0),
-                      anchored_position=(35, 225)
+                      anchor_point=(0.5, 1.0),
+                      anchored_position=(160, 230)
                       )
+
+status_font = bitmap_font.load_font(cwd+"/fonts/Helvetica-Bold-16.bdf")
+status_label = Label(status_font,
+                     text="i", # initializing
+                     scale=1,
+                     color=0xFFFFFF,
+                     anchor_point=(1.0, 0),
+                     anchored_position=(310, 10)
+                     )
+
 # Initialize the pyportal object and let us know what data to fetch and where
 # to display it
 pyportal = PyPortal(url=DATA_SOURCE,
@@ -123,6 +135,7 @@ pyportal = PyPortal(url=DATA_SOURCE,
                     text_color=0x000000,
                     )
 pyportal.splash.append(caption_label)
+pyportal.splash.append(status_label)
 
 SLEEP_TIME_SECONDS = 10*60  # wait 10 minutes between updates
 RESET_INTERVAL_SECONDS = (1 << 21) # approx 2^31 ms
@@ -133,7 +146,9 @@ while True:
         microcontroller.reset()
 
     try:
+        status_label.text = 'f' # fetching
         value = pyportal.fetch()
+        status_label.text = 'u' # updating UI
         print("Response is", value)
         if 0 <= value <= 50:
             pyportal.set_background(0x66bb6a)  # good
@@ -165,4 +180,5 @@ while True:
         # https://github.com/adafruit/Adafruit_CircuitPython_Requests/blob/8a19521fa624aa1150471ea2b066cee1d91ae296/adafruit_requests.py#L165
         print("OutOfRetries error thrown by requests - ", e)
 
+    status_label.text = 's' # sleeping
     time.sleep(SLEEP_TIME_SECONDS)
